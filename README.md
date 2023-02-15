@@ -1,4 +1,4 @@
-docker-project.ps1
+# docker-project.ps1
 docker-project.ps1 is a PowerShell script for traversing a list of directories defined in a YAML config file and invoking a Docker Compose command on each directory.
 
 Usage
