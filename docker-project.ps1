@@ -1,110 +1,63 @@
-<#
-.SYNOPSIS
-Runs Docker Compose commands on multiple projects defined in a YAML configuration file.
+[CmdletBinding()]
+Param(
+    [Parameter(Mandatory=$false, Position=0)]
+    [string]$configdirectory = $pwd,
+    
+    [Parameter(Mandatory=$false)]
+    [string]$configname = "docker-project.yaml",
 
-.DESCRIPTION
-This script reads a YAML configuration file that defines a list of projects and their directories to run Docker Compose commands on. For each project, the script changes to the project directory, then runs a Docker Compose command specified by the user.
+    [Parameter(Mandatory=$true, Position=1)]
+    [string]$projectname,
 
-.PARAMETER Command
-The Docker Compose command to run on each project. Defaults to "up".
+    [Parameter(Mandatory=$true, Position=2)]
+    [string]$command,
 
-.PARAMETER ConfigPath
-The path to the YAML configuration file. Defaults to "docker-project.yaml" in the current directory.
-
-.PARAMETER ConfigDirectory
-The directory where the YAML configuration file is located. Defaults to the current directory.
-
-.PARAMETER FileName
-The name of the YAML configuration file. If specified, overrides the default file name "docker-project.yaml".
-
-.PARAMETER Help
-Displays the script help information.
-
-.PARAMETER Verbose
-Enables verbose output.
-
-.EXAMPLE
-.\docker-project.ps1 -Command down -ConfigPath config/docker-project.yaml -Verbose
-Runs "docker-compose down" on each project defined in the "config/docker-project.yaml" file, and displays verbose output.
-
-.NOTES
-This script requires the following PowerShell modules to be installed: "powershell-yaml", "InvokeBuild". You can install them using the following commands:
-    Install-Module powershell-yaml
-    Install-Module InvokeBuild
-#>
-
-# Import required modules
-Import-Module powershell-yaml
-Import-Module InvokeBuild
-
-# Define script arguments
-param (
-    [string]$Command = "up",
-    [string]$ConfigPath = "docker-project.yaml",
-    [string]$ConfigDirectory = $PWD,
-    [string]$FileName,
-    [switch]$Help,
-    [switch]$Verbose
+    [Parameter(Mandatory=$false)]
+    [string]$args = ""
 )
 
-if ($Help) {
-    Get-Help $MyInvocation.MyCommand.Definition
-    return
+# Define the full path to the config file
+$configfile = Join-Path -Path $configdirectory -ChildPath $configname
+
+# Check if the config file exists
+if (-not(Test-Path $configfile -PathType Leaf)) {
+    Write-Error "Config file not found: $configfile"
+    exit 1
 }
 
-if ($FileName) {
-    $ConfigPath = Join-Path $ConfigDirectory $FileName
+# Load the config file
+$config = Get-Content $configfile | ConvertFrom-Yaml
+
+# Check if the specified project exists in the config file
+if (-not($config.ContainsKey($projectname))) {
+    Write-Error "Project not found: $projectname"
+    exit 1
 }
 
-# Read configuration file
-$Projects = Get-YamlContent $ConfigPath
+# Get the directories for the specified project
+$projectdirs = $config.$projectname
 
-if ($Verbose) {
-    Write-Host "Using config file: $ConfigPath"
-}
+# Invoke the command on each directory
+foreach ($dir in $projectdirs) {
+    # Change to the directory
+    Set-Location $dir
 
-foreach ($ProjectName in $Projects.Keys) {
-    $Project = $Projects[$ProjectName]
-
-    if ($Verbose) {
-        Write-Host "Project: $ProjectName"
+    # Build the command to invoke
+    if ($command -like "make*") {
+        $fullcommand = "$command $args"
+    }
+    elseif ($command -eq "up") {
+        $fullcommand = "docker-compose up -d $args"
+    }
+    elseif ($command -eq "logs") {
+        Write-Host "Command 'logs' is not implemented yet."
+        exit 1
+    }
+    else {
+        $fullcommand = "docker-compose $command $args"
     }
 
-    # Traverse project directories and run command
-    foreach ($Directory in $Project) {
-        if ($Verbose) {
-            Write-Host "Directory: $Directory"
-        }
-
-        if (Test-Path $Directory) {
-            Push-Location $Directory
-
-            $CommandToRun = ""
-            if ($Command.StartsWith("make")) {
-                $CommandToRun = $Command
-            }
-            else {
-                $CommandToRun = "docker-compose $Command"
-                if ($Command -eq "up") {
-                    $CommandToRun += " -d"
-                }
-                elseif ($Command -eq "logs") {
-                    Write-Warning "The 'logs' command is not implemented yet."
-                    Pop-Location
-                    continue
-                }
-            }
-
-            if ($Verbose) {
-                Write-Host "Running command: $CommandToRun"
-            }
-
-            Invoke-Command -ScriptBlock { Invoke-Build -Task $CommandToRun } -Verbose:$Verbose
-
-            Pop-Location
-        }
-        else {
-            Write-Warning "Directory not found: $Directory"
-        }
-    }
+    # Invoke the command
+    Write-Host "Invoking command '$fullcommand' in directory '$dir'"
+    Invoke-Expression $fullcommand
 }
