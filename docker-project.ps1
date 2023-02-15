@@ -7,7 +7,10 @@ Param(
     [string]$configname = "docker-project.yaml",
 
     [Parameter(Mandatory=$false)]
-    [string]$project = "default"
+    [string]$project = "default",
+
+    [Parameter(Mandatory=$true, Position=1)]
+    [string]$command
 )
 
 function Invoke-CommandInDirectory {
@@ -36,24 +39,32 @@ try {
     $config = Get-Content -Path $configPath | ConvertFrom-Yaml
     $projects = $config.psobject.Properties | Where-Object { $_.Type.Name -eq "Array" } | Select-Object -ExpandProperty Name
 
-    if (-not($projects.Contains($project))) {
+    if ($project -ne "all" -and -not($projects.Contains($project))) {
         throw "Project '$project' not found in config file"
     }
 
-    $directories = $config.$project
-    $command = "docker-compose $($args -join ' ')"
-
-    if ($args[0] -eq "up") {
-        $command += " -d"
+    if ($project -eq "all") {
+        $projectsToProcess = $projects
+    } else {
+        $projectsToProcess = $project
     }
 
-    foreach ($directory in $directories) {
-        if ($args[0] -eq "logs") {
-            Write-Host "The logs command is not implemented yet"
-        } elseif ($args[0] -like "make*") {
-            Invoke-CommandInDirectory -directory $directory -command $args
-        } else {
-            Invoke-CommandInDirectory -directory $directory -command $command
+    foreach ($projectToProcess in $projectsToProcess) {
+        $directories = $config.$projectToProcess
+        $commandToExecute = "docker-compose $($command)"
+
+        if ($command -eq "up") {
+            $commandToExecute += " -d"
+        }
+
+        foreach ($directory in $directories) {
+            if ($command -eq "logs") {
+                Write-Host "The logs command is not implemented yet"
+            } elseif ($command -like "make*") {
+                Invoke-CommandInDirectory -directory $directory -command $command
+            } else {
+                Invoke-CommandInDirectory -directory $directory -command $commandToExecute
+            }
         }
     }
 }
