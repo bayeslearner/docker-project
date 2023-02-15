@@ -2,62 +2,64 @@
 Param(
     [Parameter(Mandatory=$false, Position=0)]
     [string]$configdirectory = $pwd,
-    
+
     [Parameter(Mandatory=$false)]
     [string]$configname = "docker-project.yaml",
 
-    [Parameter(Mandatory=$true, Position=1)]
-    [string]$projectname,
-
-    [Parameter(Mandatory=$true, Position=2)]
-    [string]$command,
-
     [Parameter(Mandatory=$false)]
-    [string]$args = ""
+    [string]$project = "default"
 )
 
-# Define the full path to the config file
-$configfile = Join-Path -Path $configdirectory -ChildPath $configname
+function Invoke-CommandInDirectory {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$directory,
+        
+        [Parameter(Mandatory=$true)]
+        [string]$command
+    )
 
-# Check if the config file exists
-if (-not(Test-Path $configfile -PathType Leaf)) {
-    Write-Error "Config file not found: $configfile"
-    exit 1
+    Write-Host "Running command '$command' in directory '$directory'"
+    Set-Location -Path $directory
+    Invoke-Expression $command
+    Set-Location -Path $script:initialDirectory
 }
 
-# Load the config file
-$config = Get-Content $configfile | ConvertFrom-Yaml
+try {
+    $initialDirectory = $pwd
+    $configPath = Join-Path -Path $configdirectory -ChildPath $configname
 
-# Check if the specified project exists in the config file
-if (-not($config.ContainsKey($projectname))) {
-    Write-Error "Project not found: $projectname"
-    exit 1
+    if (-not(Test-Path $configPath)) {
+        throw "Config file '$configPath' not found"
+    }
+
+    $config = Get-Content -Path $configPath | ConvertFrom-Yaml
+    $projects = $config.psobject.Properties | Where-Object { $_.Type.Name -eq "Array" } | Select-Object -ExpandProperty Name
+
+    if (-not($projects.Contains($project))) {
+        throw "Project '$project' not found in config file"
+    }
+
+    $directories = $config.$project
+    $command = "docker-compose $($args -join ' ')"
+
+    if ($args[0] -eq "up") {
+        $command += " -d"
+    }
+
+    foreach ($directory in $directories) {
+        if ($args[0] -eq "logs") {
+            Write-Host "The logs command is not implemented yet"
+        } elseif ($args[0] -like "make*") {
+            Invoke-CommandInDirectory -directory $directory -command $args
+        } else {
+            Invoke-CommandInDirectory -directory $directory -command $command
+        }
+    }
 }
-
-# Get the directories for the specified project
-$projectdirs = $config.$projectname
-
-# Invoke the command on each directory
-foreach ($dir in $projectdirs) {
-    # Change to the directory
-    Set-Location $dir
-
-    # Build the command to invoke
-    if ($command -like "make*") {
-        $fullcommand = "$command $args"
-    }
-    elseif ($command -eq "up") {
-        $fullcommand = "docker-compose up -d $args"
-    }
-    elseif ($command -eq "logs") {
-        Write-Host "Command 'logs' is not implemented yet."
-        exit 1
-    }
-    else {
-        $fullcommand = "docker-compose $command $args"
-    }
-
-    # Invoke the command
-    Write-Host "Invoking command '$fullcommand' in directory '$dir'"
-    Invoke-Expression $fullcommand
+catch {
+    Write-Host "Error: $_" -ForegroundColor Red
+}
+finally {
+    Set-Location -Path $initialDirectory
 }
