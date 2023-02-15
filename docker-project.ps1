@@ -71,7 +71,11 @@ function Invoke-Project {
     }
 
     foreach ($directory in $project) {
-        Run-Command -command $command -directory $directory
+        if (Test-Path $directory) {
+            Run-Command -command $command -directory $directory
+        } else {
+            Write-Host "Directory '$directory' not found"
+        }
     }
 }
 
