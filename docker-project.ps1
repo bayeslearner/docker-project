@@ -1,59 +1,110 @@
-param(
-    [Parameter(Mandatory=$true, HelpMessage="Path to the directory containing the YAML config file.")]
-    [string]$ConfigDirectory,
+<#
+.SYNOPSIS
+Runs Docker Compose commands on multiple projects defined in a YAML configuration file.
 
-    [Parameter(HelpMessage="Name of the YAML config file. Defaults to 'docker-project.yaml'.")]
-    [string]$ConfigFileName = "docker-project.yaml",
+.DESCRIPTION
+This script reads a YAML configuration file that defines a list of projects and their directories to run Docker Compose commands on. For each project, the script changes to the project directory, then runs a Docker Compose command specified by the user.
 
-    [Parameter(Mandatory=$true, HelpMessage="Arguments to pass to 'docker-compose' command.")]
-    [string]$ComposeArgs
+.PARAMETER Command
+The Docker Compose command to run on each project. Defaults to "up".
+
+.PARAMETER ConfigPath
+The path to the YAML configuration file. Defaults to "docker-project.yaml" in the current directory.
+
+.PARAMETER ConfigDirectory
+The directory where the YAML configuration file is located. Defaults to the current directory.
+
+.PARAMETER FileName
+The name of the YAML configuration file. If specified, overrides the default file name "docker-project.yaml".
+
+.PARAMETER Help
+Displays the script help information.
+
+.PARAMETER Verbose
+Enables verbose output.
+
+.EXAMPLE
+.\docker-project.ps1 -Command down -ConfigPath config/docker-project.yaml -Verbose
+Runs "docker-compose down" on each project defined in the "config/docker-project.yaml" file, and displays verbose output.
+
+.NOTES
+This script requires the following PowerShell modules to be installed: "powershell-yaml", "InvokeBuild". You can install them using the following commands:
+    Install-Module powershell-yaml
+    Install-Module InvokeBuild
+#>
+
+# Import required modules
+Import-Module powershell-yaml
+Import-Module InvokeBuild
+
+# Define script arguments
+param (
+    [string]$Command = "up",
+    [string]$ConfigPath = "docker-project.yaml",
+    [string]$ConfigDirectory = $PWD,
+    [string]$FileName,
+    [switch]$Help,
+    [switch]$Verbose
 )
 
-function Show-Help {
-    Write-Host "Usage: `n"
-    Write-Host "    ./docker-project.ps1 -ConfigDirectory <directory> [-ConfigFileName <file name>] -ComposeArgs <arguments>`n`n"
-    Write-Host "Parameters:`n"
-    Write-Host "    -ConfigDirectory: Path to the directory containing the YAML config file. This parameter is required.`n"
-    Write-Host "    -ConfigFileName: Name of the YAML config file. Defaults to 'docker-project.yaml'.`n"
-    Write-Host "    -ComposeArgs: Arguments to pass to 'docker-compose' command. This parameter is required.`n"
-    exit
+if ($Help) {
+    Get-Help $MyInvocation.MyCommand.Definition
+    return
 }
 
-if ($ConfigDirectory -eq "--help" -or $ConfigDirectory -eq "-h") {
-    Show-Help
+if ($FileName) {
+    $ConfigPath = Join-Path $ConfigDirectory $FileName
 }
 
-$configPath = Join-Path $ConfigDirectory $ConfigFileName
+# Read configuration file
+$Projects = Get-YamlContent $ConfigPath
 
-if (-not (Test-Path $configPath)) {
-    Write-Error "Config file not found: $configPath"
-    exit
+if ($Verbose) {
+    Write-Host "Using config file: $ConfigPath"
 }
 
-$config = Get-Content $configPath | ConvertFrom-Yaml
+foreach ($ProjectName in $Projects.Keys) {
+    $Project = $Projects[$ProjectName]
 
-foreach ($project in $config) {
-    Write-Host "Project: $($project.Name)"
-    foreach ($dir in $project.Directories) {
-        $dirPath = Join-Path $ConfigDirectory $dir
-        if (-not (Test-Path $dirPath)) {
-            Write-Warning "Directory not found: $dirPath"
-            continue
+    if ($Verbose) {
+        Write-Host "Project: $ProjectName"
+    }
+
+    # Traverse project directories and run command
+    foreach ($Directory in $Project) {
+        if ($Verbose) {
+            Write-Host "Directory: $Directory"
         }
-        if ($ComposeArgs -eq "up") {
-            $ComposeArgs += " -d"
+
+        if (Test-Path $Directory) {
+            Push-Location $Directory
+
+            $CommandToRun = ""
+            if ($Command.StartsWith("make")) {
+                $CommandToRun = $Command
+            }
+            else {
+                $CommandToRun = "docker-compose $Command"
+                if ($Command -eq "up") {
+                    $CommandToRun += " -d"
+                }
+                elseif ($Command -eq "logs") {
+                    Write-Warning "The 'logs' command is not implemented yet."
+                    Pop-Location
+                    continue
+                }
+            }
+
+            if ($Verbose) {
+                Write-Host "Running command: $CommandToRun"
+            }
+
+            Invoke-Command -ScriptBlock { Invoke-Build -Task $CommandToRun } -Verbose:$Verbose
+
+            Pop-Location
         }
-        if ($ComposeArgs -like "make*") {
-            $command = $ComposeArgs
-        } elseif ($ComposeArgs -eq "logs") {
-            Write-Warning "Command 'logs' is not implemented yet."
-            continue
-        } else {
-            $command = "docker-compose " + $ComposeArgs
+        else {
+            Write-Warning "Directory not found: $Directory"
         }
-        Write-Host "Invoking command '$command' in directory '$dirPath'"
-        Push-Location $dirPath
-        Invoke-Expression $command
-        Pop-Location
     }
 }
