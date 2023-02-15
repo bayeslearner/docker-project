@@ -3,12 +3,39 @@ docker-project.ps1 is a PowerShell script for traversing a list of directories d
 
 Usage
 ```
-./docker-project.ps1 [-ConfigPath <path>] [-Command <command>] [-Help] [-Verbose]
-Arguments
--ConfigPath <path>: The path to the YAML config file. Defaults to ./docker-project.yaml.
--Command <command>: The Docker Compose command to run. Defaults to up. If the command is up, it will be appended with the -d flag. If the command is logs, a message will be printed saying that it is not yet implemented. If the command starts with make, it will not be concatenated with docker-compose.
--Help: Prints the help message.
--Verbose: Prints verbose output.
+NAME
+    docker-project.ps1 - Script to run docker-compose commands on specified directories.
+
+SYNOPSIS
+    docker-project.ps1 [-Project <String>] [-ConfigDirectory <String>] [-ConfigFile <String>] -Command <String> [<CommonParameters>]
+
+DESCRIPTION
+    This script reads a YAML configuration file and runs specified docker-compose commands on the directories listed in the file.
+
+    Required Parameters:
+        -Command <String>
+            The docker-compose command to run. Options are: up, down, logs.
+        -Project <String>
+            The name of the project as specified in the configuration file.
+
+    Optional Parameters:
+        -ConfigDirectory <String>
+            The path to the directory where the configuration file is located. Default is the current directory.
+        -ConfigFile <String>
+            The name of the configuration file. Default is 'docker-project.yaml'.
+
+EXAMPLES
+    docker-project.ps1 -Command up -Project default
+    docker-project.ps1 -Command logs -Project project1 -ConfigDirectory c:\config\ -ConfigFile my-config.yaml
+
+REMARKS
+    To use this script, you must have Docker and Docker Compose installed.
+
+    If the specified directory for a project does not exist, the script will skip that project and continue to the next one.
+
+AUTHOR
+    ChatGPT
+
 ```
 
 Config File Format
