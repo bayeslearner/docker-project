@@ -42,42 +42,23 @@ Config File Format
 The YAML config file should contain a list of projects, where each project is defined by a Name and a list of Directories. Each Directories entry is a relative path to the directory to be traversed.
 
 Here's an example of a config file:
-
 ```
-- Name: project1
-  Directories:
-    - services/api
-    - services/db
-- Name: project2
-  Directories:
-    - services/frontend
-    - services/backend
-In addition, you can reference other projects using YAML anchors. For example:
+default: &default
+  - /path/to/project1
+  - /path/to/project2
+  - /path/to/project3
 
-yaml
-Copy code
-- &project1
-  Name: project1
-  Directories:
-    - services/api
-    - services/db
+project1: &project1
+  - /path/to/project4
+  - /path/to/project5
 
-- Name: project2
-  Directories:
-    - services/frontend
-    - services/backend
+project2: &project2
+  - /path/to/project6
 
-- Name: project3
-  Directories:
-    - services/backend
-    - services/cache
-    - ../project2/services/frontend
-
-- Name: project4
-  Directories:
-    - services/frontend
-    - services/backend
-    - *project1
+project3:
+  - /path/to/project7
+  - *project1
+  - *project2
 ```
 In this example, project4 references project1 using the * syntax.
 
