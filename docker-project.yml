@@ -1,0 +1,22 @@
+- &project1
+  Name: project1
+  Directories:
+    - services/api
+    - services/db
+
+- Name: project2
+  Directories:
+    - services/frontend
+    - services/backend
+
+- Name: project3
+  Directories:
+    - services/backend
+    - services/cache
+    - ../project2/services/frontend
+
+- Name: project4
+  Directories:
+    - services/frontend
+    - services/backend
+    - *project1
