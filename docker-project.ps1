@@ -110,4 +110,4 @@ param (
     [string]$ConfigFile = "docker-project.yaml"
 )
 
-Invoke-Project -projectName $Project -command $Command -configDirectory $ConfigDirectory -configFile
+Invoke-Project -projectName $Project -command $Command -configDirectory $ConfigDirectory -configFile $configFile
