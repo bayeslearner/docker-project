@@ -92,7 +92,7 @@ function Get-YamlConfig {
         exit
     }
 
-    $config = Get-Content $configPath | Out-String | ConvertFrom-Yaml
+    $config = Get-Content $configPath | Out-String | ConvertFrom-Yaml -UseMergingParser
     return $config
 }
 
@@ -110,4 +110,4 @@ param (
     [string]$ConfigFile = "docker-project.yaml"
 )
 
-Invoke-Project -projectName $Project -command $Command -configDirectory $ConfigDirectory -configFile $ConfigFile
+Invoke-Project -projectName $Project -command $Command -configDirectory $ConfigDirectory -configFile
