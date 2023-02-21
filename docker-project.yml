@@ -1,16 +1,17 @@
 default: &default
-  - /path/to/project1
-  - /path/to/project2
-  - /path/to/project3
+  - *core
+  - *splunk
 
-project1: &project1
-  - /path/to/project4
-  - /path/to/project5
+core: &core
+  - services/sharednetwork
+  - services/traefik
 
-project2: &project2
-  - /path/to/project6
 
-project3:
-  - /path/to/project7
-  - *project1
-  - *project2
+
+budibase: &budibase
+  - projects/compose-budibase
+  - services/mssql
+
+splunk: &splunk
+  - *core
+  - projects/compose-splunk
